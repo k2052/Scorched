@@ -158,8 +158,8 @@ module Scorched
       # Called when a controller is subclassed
       # used to init class accessors and set the current app_file
       def inherited(subclass)
-        sublass.extensions ||= []
-        subclass.set :app_file, caller_files.first unless subclass.app_file?
+        subclass.extensions = []
+        subclass.set :app_file, caller_files.first unless subclass.respond_to?(:app_file)
         super
       end
 
