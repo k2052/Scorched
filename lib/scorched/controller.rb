@@ -154,6 +154,26 @@ module Scorched
           filter(type, *args, &block)
         end
       end
+
+      # Helpers method. Ported from sinatra
+      # Makes the methods defined in the block and in the Modules given
+      # in `extensions` available to the handlers and templates
+      def helpers(*extensions, &block)
+        class_eval(&block)   if block_given?
+        include(*extensions) if extensions.any?
+      end
+      
+      # Register methods for extensions. Ported from sinatra
+      # Register an extension. Alternatively take a block from which an
+      # extension will be created and registered on the fly.
+      def register(*extensions, &block)
+        extensions << Module.new(&block) if block_given?
+        @extensions += extensions
+        extensions.each do |extension|
+          extend extension
+          extension.registered(self) if extension.respond_to?(:registered)
+        end
+      end
       
     private
     
