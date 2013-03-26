@@ -154,6 +154,24 @@ module Scorched
           filter(type, *args, &block)
         end
       end
+      
+      # Called when a controller is subclassed
+      # used to init class accessors and set the current app_file
+      def inherited(subclass)
+        sublass.extensions ||= []
+        subclass.set :app_file, caller_files.first unless subclass.app_file?
+        super
+      end
+
+      # Extension modules registered on this class and all superclasses.
+      # Ported from sinatra
+      def extensions
+        if superclass.respond_to?(:extensions)
+          (@extensions + superclass.extensions).uniq
+        else
+          @extensions
+        end
+      end
 
       # Helpers method. Ported from sinatra
       # Makes the methods defined in the block and in the Modules given
