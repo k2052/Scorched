@@ -66,7 +66,7 @@ module Scorched
     
     class << self
       attr_accessor :extensions
-      
+
       def mappings
         @mappings ||= []
       end
@@ -469,18 +469,29 @@ module Scorched
     # Refer to Tilt documentation for a list of valid template engines.
     def render(string_or_file, options = {}, &block)
       options = render_defaults.merge(explicit_options = options)
-      engine = (derived_engine = Tilt[string_or_file.to_s]) || Tilt[options[:engine]]
+      engine  = (derived_engine = Tilt[string_or_file.to_s]) || Tilt[options[:engine]]
+
+      tilt_options = options.dup
+      tilt_options.delete(:engine)
+
+      ## TODO Figure out how to pass these options to slim
+      if derived_engine == :slim || options[:engine] == :slim
+        tilt_options.delete(:dir)
+        tilt_options.delete(:layout)
+      end
+   
       raise Error, "Invalid or undefined template engine: #{options[:engine].inspect}" unless engine
       if Symbol === string_or_file
         file = string_or_file.to_s
         file = file << ".#{options[:engine]}" unless derived_engine
         file = File.join(options[:dir], file) if options[:dir]
         # Tilt still has unresolved file encoding issues. Until that's fixed, we read the file manually.
-        template = engine.new(nil, nil, options) { File.read(file) }
+        template = engine.new(nil, nil, tilt_options) { File.read(file) }
       else
-        template = engine.new(nil, nil, options) { string_or_file }
+        options.delete(:engine)
+        template = engine.new(nil, nil, tilt_options) { string_or_file }
       end
-      
+
       # The following chunk of code is responsible for preventing the rendering of layouts within views.
       options[:layout] = false if @_no_default_layout && !explicit_options[:layout]
       begin
