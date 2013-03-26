@@ -65,6 +65,7 @@ module Scorched
     }
     
     class << self
+      attr_accessor :extensions
       
       def mappings
         @mappings ||= []
