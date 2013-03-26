@@ -193,6 +193,34 @@ module Scorched
         end
       end
       
+      # Called file handling.
+      # Ported from sinatra
+      CALLERS_TO_IGNORE = [ # :nodoc:
+        /\/scorched(\/(controller))?\.rb$/,                 # all scorched code
+        /lib\/tilt.*\.rb$/,                                 # all tilt code
+        /^\(.*\)$/,                                         # generated code
+        /rubygems\/(custom|core_ext\/kernel)_require\.rb$/, # rubygems require hacks
+        /active_support/,                                   # active_support require hacks
+        /bundler(\/runtime)?\.rb/,                          # bundler require hacks
+        /<internal:/,                                       # internal in ruby >= 1.9.2
+        /src\/kernel\/bootstrap\/[A-Z]/                     # maglev kernel files
+      ]
+
+      # Like Kernel#caller but excluding certain magic entries and without
+      # line / method information; the resulting array contains filenames only.
+      # Ported from Sinatra
+      def caller_files
+        cleaned_caller(1).flatten
+      end
+
+      # Like Kernel#caller but excluding certain magic entries
+      # Ported from Sinatra
+      def cleaned_caller(keep = 3)
+        caller(1).
+          map    { |line| line.split(/:(?=\d|in )/, 3)[0,keep] }.
+          reject { |file, *_| CALLERS_TO_IGNORE.any? { |pattern| file =~ pattern } }
+      end
+
     private
     
       # Parses and compiles the given URL string pattern into a regex if not already, returning the resulting regexp
