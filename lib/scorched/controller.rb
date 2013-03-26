@@ -192,6 +192,44 @@ module Scorched
           extension.registered(self) if extension.respond_to?(:registered)
         end
       end
+
+      # Sets an option to the given value.  If the value is a proc,
+      # the proc will be called every time the option is accessed.
+      # Ported from Sinatra
+      def set(option, value = (not_set = true), ignore_setter = false, &block)
+        raise ArgumentError if block and !not_set
+        value, not_set = block, false if block
+
+        if not_set
+          raise ArgumentError unless option.respond_to?(:each)
+          option.each { |k,v| set(k, v) }
+          return self
+        end
+
+        if respond_to?("#{option}=") and not ignore_setter
+          return __send__("#{option}=", value)
+        end
+
+        setter = proc { |val| set option, val, true }
+        getter = proc { value }
+
+        case value
+        when Proc
+          getter = value
+        when Symbol, Fixnum, FalseClass, TrueClass, NilClass
+          getter = value.inspect
+        when Hash
+          setter = proc do |val|
+            val = value.merge val if Hash === val
+            set option, val, true
+          end
+        end
+
+        define_singleton("#{option}=", setter) if setter
+        define_singleton(option, getter) if getter
+        define_singleton("#{option}?", "!!#{option}") unless method_defined? "#{option}?"
+        self
+      end
       
       # Called file handling.
       # Ported from sinatra
@@ -244,6 +282,26 @@ module Scorched
         regex_pattern << '$' if match_to_end
         Regexp.new(regex_pattern)
       end
+
+      # Dynamically defines a method on settings.
+      # Ported from Sinatra
+      def define_singleton(name, content = Proc.new)
+        # replace with call to singleton_class once we're 1.9 only
+        (class << self; self; end).class_eval do
+          undef_method(name) if method_defined? name
+          String === content ? class_eval("def #{name}() #{content}; end") : define_method(name, &content)
+        end
+      end
+    end
+
+    # Access settings defined with Controller.set.
+    def self.settings
+      self
+    end
+
+    # Access settings defined with Controller.set.
+    def settings
+      self.class.settings
     end
     
     def method_missing(method, *args, &block)
