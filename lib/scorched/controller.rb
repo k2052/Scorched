@@ -1,4 +1,6 @@
 module Scorched
+  class TemplateNotFoundError < RuntimeError
+  end
   class Controller
     include Scorched::Options('config')
     include Scorched::Options('render_defaults')
@@ -509,6 +511,8 @@ module Scorched
       if Symbol === string_or_file
         file = string_or_file.to_s
         file = File.join(options[:dir], file) if options[:dir]
+
+        raise ::Scorched::TemplateNotFoundError, "Template File: #{file} does not exist" unless File.exists?(file)
         # Tilt still has unresolved file encoding issues. Until that's fixed, we read the file manually.
         template = engine.new(nil, nil, tilt_options) { File.read(file) }
       else
