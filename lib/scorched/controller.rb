@@ -461,6 +461,26 @@ module Scorched
       end
     end
     
+    # Derives the engine based on file extension and returns a symbol
+    def derive_engine_symbol(string_or_file)
+      if string_or_file.is_a?(Symbol)
+
+        pattern = string_or_file.to_s.downcase
+        until pattern.empty? || Tilt.registered?(pattern)
+          pattern = File.basename(pattern)
+          pattern.sub!(/^[^.]*\.?/, '')
+        end
+
+        if pattern.empty?
+          return nil
+        else
+          return pattern.to_sym
+        end
+      else 
+        return nil
+      end
+    end
+    
     # Renders the given string or file path using the Tilt templating library.
     # The options hash is merged with the controllers _render_defaults_. Unrecognised options are passed through to Tilt. 
     # The template engine is derived from file name, or otherwise as specified by the _:engine_ option. If a string is
@@ -468,27 +488,30 @@ module Scorched
     #
     # Refer to Tilt documentation for a list of valid template engines.
     def render(string_or_file, options = {}, &block)
-      options = render_defaults.merge(explicit_options = options)
-      engine  = (derived_engine = Tilt[string_or_file.to_s]) || Tilt[options[:engine]]
+      derived_engine   = derive_engine_symbol(string_or_file) unless options[:engine]
+      options[:engine] = derived_engine if derived_engine 
+      options          = render_defaults.merge(explicit_options = options)
+      string_or_file   = (string_or_file.to_s + ".#{options[:engine]}").to_sym unless derived_engine
+
+      engine = Tilt[options[:engine]]
+
+      raise Error, "Invalid or undefined template engine: #{options[:engine].inspect}" unless engine
 
       tilt_options = options.dup
       tilt_options.delete(:engine)
 
       ## TODO Figure out how to pass these options to slim
-      if derived_engine == :slim || options[:engine] == :slim
+      if options[:engine] == :slim
         tilt_options.delete(:dir)
         tilt_options.delete(:layout)
       end
    
-      raise Error, "Invalid or undefined template engine: #{options[:engine].inspect}" unless engine
       if Symbol === string_or_file
         file = string_or_file.to_s
-        file = file << ".#{options[:engine]}" unless derived_engine
         file = File.join(options[:dir], file) if options[:dir]
         # Tilt still has unresolved file encoding issues. Until that's fixed, we read the file manually.
         template = engine.new(nil, nil, tilt_options) { File.read(file) }
       else
-        options.delete(:engine)
         template = engine.new(nil, nil, tilt_options) { string_or_file }
       end
 
